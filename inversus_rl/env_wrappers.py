@@ -83,60 +83,90 @@ def dummy_opponent_policy(env: InversusEnv, difficulty: str = "easy") -> Action:
         shoot_prob = 0.0        # 0% (Never shoots)
         random_move_prob = 0.0  # 0%
     else:
-        # Hard / Normal
-        move_prob = 1.0         # Always move if logic says so
-        shoot_prob = 0.01       # 1% per frame
-        random_move_prob = 0.2  # 20% distraction
+        # Hard / Normal (Hunter-Killer)
+        move_prob = 0.9         # 90% chance to move if needed
+        shoot_prob = 0.2        # 20% chance to shoot PER FRAME if aligned (Aggressive)
+        random_move_prob = 0.05 # 5% random noise
 
-    # Move random move logic to TOP so it can interrupt shooting (Distracted)
+    # 1. SHOOTING LOGIC (Priority 1)
+    # Check alignment
+    is_x_aligned = (p2.x == p1.x)
+    is_y_aligned = (p2.y == p1.y)
+    
+    should_shoot = random.random() < shoot_prob
+    if should_shoot and p2.ammo > 0 and (is_x_aligned or is_y_aligned):
+        if is_x_aligned:
+            return Action(ActionType.SHOOT, Direction.UP if p1.y < p2.y else Direction.DOWN)
+        elif is_y_aligned:
+            return Action(ActionType.SHOOT, Direction.LEFT if p1.x < p2.x else Direction.RIGHT)
+
+    # 2. RANDOM INTERRUPT
     directions = [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT]
     if random.random() < random_move_prob:
         random.shuffle(directions)
-        return Action(ActionType.MOVE, directions[0])
-    
-    # Shooting Logic
-    should_shoot = random.random() < shoot_prob
-    if should_shoot and p1.x == p2.x and p2.ammo > 0:
-        if p1.y < p2.y:
-            return Action(ActionType.SHOOT, Direction.UP)
-        elif p1.y > p2.y:
-            return Action(ActionType.SHOOT, Direction.DOWN)
-            
-    if should_shoot and p1.y == p2.y and p2.ammo > 0:
-        if p1.x < p2.x:
-            return Action(ActionType.SHOOT, Direction.LEFT)
-        elif p1.x > p2.x:
-            return Action(ActionType.SHOOT, Direction.RIGHT)
-    
-    # Movement Logic
-    # In easy mode, we only move rarely
+        candidate_dir = directions[0]
+        # Check validity (briefly)
+        vx, vy = 0, 0
+        if candidate_dir == Direction.UP: vy = -1
+        elif candidate_dir == Direction.DOWN: vy = 1
+        elif candidate_dir == Direction.LEFT: vx = -1
+        elif candidate_dir == Direction.RIGHT: vx = 1
+        
+        nx, ny = p2.x + vx, p2.y + vy
+        if env._tile_in_bounds(nx, ny):
+             tile = env._get_tile(nx, ny)
+             if tile != p2.color:
+                 return Action(ActionType.MOVE, candidate_dir)
+
+    # 3. MOVEMENT LOGIC (Priority 2: HUNT)
     if difficulty == "easy":
         if random.random() > move_prob:
              return Action(ActionType.NONE, None)
-             
-    # Otherwise, try safe move
-    random.shuffle(directions)
-    for direction in directions:
-        # Check if move would be valid
-        dx, dy = 0, 0
-        if direction == Direction.UP:
-            dy = -1
-        elif direction == Direction.DOWN:
-            dy = 1
-        elif direction == Direction.LEFT:
-            dx = -1
-        elif direction == Direction.RIGHT:
-            dx = 1
+    
+    # Hunter Logic: Move to align
+    dx = p1.x - p2.x
+    dy = p1.y - p2.y
+    
+    candidates = []
+    # To align X (so we can shoot Y), we need to change P2.x (Left/Right)
+    if dx != 0:
+        candidates.append(Direction.RIGHT if dx > 0 else Direction.LEFT)
+    # To align Y (so we can shoot X), we need to change P2.y (Up/Down)
+    if dy != 0:
+        candidates.append(Direction.DOWN if dy > 0 else Direction.UP)
         
-        nx = p2.x + dx
-        ny = p2.y + dy
+    random.shuffle(candidates)
+    
+    for direction in candidates:
+        vx, vy = 0, 0
+        if direction == Direction.UP: vy = -1
+        elif direction == Direction.DOWN: vy = 1
+        elif direction == Direction.LEFT: vx = -1
+        elif direction == Direction.RIGHT: vx = 1
+        
+        nx, ny = p2.x + vx, p2.y + vy
         
         if env._tile_in_bounds(nx, ny):
             tile = env._get_tile(nx, ny)
             if tile != p2.color:  # Walkable
                 return Action(ActionType.MOVE, direction)
                 
-    # Fallback if no move is possible (e.g. trapped)
+    # Fallback: Random safe move if hunting moves are blocked
+    random.shuffle(directions)
+    for direction in directions:
+        vx, vy = 0, 0
+        if direction == Direction.UP: vy = -1
+        elif direction == Direction.DOWN: vy = 1
+        elif direction == Direction.LEFT: vx = -1
+        elif direction == Direction.RIGHT: vx = 1
+        
+        nx, ny = p2.x + vx, p2.y + vy
+        
+        if env._tile_in_bounds(nx, ny):
+            tile = env._get_tile(nx, ny)
+            if tile != p2.color:
+                return Action(ActionType.MOVE, direction)
+
     return Action(ActionType.NONE, None)
 
 
@@ -496,4 +526,3 @@ class MultiEnvRunner:
         dones = np.array(done_list, dtype=bool)
         
         return (grid_tensors, extra_vectors), rewards, dones, info_list
-

@@ -91,7 +91,7 @@ def create_visualizations(df, output_dir):
     # Save main figure
     main_path = os.path.join(output_dir, 'training_overview.png')
     plt.savefig(main_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved main overview: {main_path}")
+    print(f"[DONE] Saved main overview: {main_path}")
     
     # Figure 2: Loss Curves
     fig2, axes2 = plt.subplots(1, 2, figsize=(14, 5))
@@ -116,7 +116,7 @@ def create_visualizations(df, output_dir):
     # Save loss figure
     loss_path = os.path.join(output_dir, 'training_losses.png')
     plt.savefig(loss_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved loss curves: {loss_path}")
+    print(f"[DONE] Saved loss curves: {loss_path}")
     
     # Figure 3: Performance Summary
     fig3, ax = plt.subplots(figsize=(10, 6))
@@ -162,7 +162,7 @@ def create_visualizations(df, output_dir):
     # Save summary
     summary_path = os.path.join(output_dir, 'training_summary.png')
     plt.savefig(summary_path, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved summary: {summary_path}")
+    print(f"[DONE] Saved summary: {summary_path}")
     
     # Print summary to console
     print("\n" + "="*50)
@@ -229,7 +229,7 @@ Examples:
         traceback.print_exc()
         sys.exit(1)
     
-    print(f"\n✓ All visualizations saved to: {output_dir}\n")
+    print(f"\n[DONE] All visualizations saved to: {output_dir}\n")
     
     # Show plots if requested
     if args.show:

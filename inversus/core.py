@@ -53,19 +53,26 @@ class InversusEnv:
         self.reset()
     
     def reset(self, seed: Optional[int] = None) -> None:
-        """Reset the environment to the initial state."""
+        """Reset the environment to the initial state with RANDOM spawns."""
         if seed is not None:
             self.rng = random.Random(seed)
+        elif self.rng is None:
+             self.rng = random.Random()
         
+        # 1. Randomize Map Dimensions (Optional, but let's keep 15x10 for now)
+        # 2. Initialize Grid
         # Create initial grid (using player 1 color for backward compatibility)
         self.grid = make_initial_grid(self.width, self.height, self.player_color)
         
-        # Initialize player 1
-        p1_start_x, p1_start_y = DEFAULT_PLAYER_START
+        # 3. Randomize Player 1 Start
+        # Valid range: Keep away from edges to avoid immediate wall-stuck
+        p1_x = self.rng.randint(1, self.width - 2)
+        p1_y = self.rng.randint(1, self.height - 2)
+        
         self.player1 = PlayerState(
             player_id=PlayerId.P1,
-            x=p1_start_x,
-            y=p1_start_y,
+            x=p1_x,
+            y=p1_y,
             color=self.player_color,
             ammo=MAX_AMMO,
             max_ammo=MAX_AMMO,
@@ -73,18 +80,51 @@ class InversusEnv:
             alive=True
         )
         
-        # Initialize player 2
-        p2_start_x, p2_start_y = DEFAULT_PLAYER2_START
-        # Ensure P2 start is within bounds, adjust if needed
-        if p2_start_x >= self.width:
-            p2_start_x = self.width - 1
-        if p2_start_y >= self.height:
-            p2_start_y = self.height - 1
+        # 4. Randomize Player 2 Start (Ensure distance)
+        # Try to find a position at least 4 tiles away
+        for _ in range(20): # Try 20 times
+            p2_x = self.rng.randint(1, self.width - 2)
+            p2_y = self.rng.randint(1, self.height - 2)
+            dist = abs(p2_x - p1_x) + abs(p2_y - p1_y)
+            if dist > 4:
+                break
         
+        # Apply P2 Logic...
+        # Update grid for P2 (Make P2 area walkable)
+        # ... We need to update make_initial_grid logic or manually clear area for P2
+        # Let's manually clear the area around P2 so it's fair
+        opposite_color = TileColor.WHITE if self.player_color == TileColor.BLACK else TileColor.BLACK
+        
+        # Create plus-shaped walkable area for P2
+        positions = [
+            (p2_x, p2_y),      # center
+            (p2_x + 1, p2_y),  # right
+            (p2_x - 1, p2_y),  # left
+            (p2_x, p2_y + 1),  # down
+            (p2_x, p2_y - 1),  # up
+        ]
+        for x, y in positions:
+            if 0 <= x < self.width and 0 <= y < self.height:
+                self.grid[y][x] = opposite_color
+                
+        # Also clear area for P1 (since we randomized it)
+        # (Re-do P1 area just in case Grid init didn't cover it)
+        p1_positions = [
+            (p1_x, p1_y),
+            (p1_x + 1, p1_y),
+            (p1_x - 1, p1_y),
+            (p1_x, p1_y + 1),
+            (p1_x, p1_y - 1),
+        ]
+        for x, y in p1_positions:
+            if 0 <= x < self.width and 0 <= y < self.height:
+                self.grid[y][x] = TileColor.WHITE if self.player1.color == TileColor.BLACK else TileColor.BLACK # Walkable for P1
+                
+        # Initialize player 2 object
         self.player2 = PlayerState(
             player_id=PlayerId.P2,
-            x=p2_start_x,
-            y=p2_start_y,
+            x=p2_x,
+            y=p2_y,
             color=DEFAULT_PLAYER2_COLOR,
             ammo=MAX_AMMO,
             max_ammo=MAX_AMMO,
@@ -95,11 +135,11 @@ class InversusEnv:
         # Create walkable area for player 2 as well
         opposite_color_p2 = TileColor.WHITE if DEFAULT_PLAYER2_COLOR == TileColor.BLACK else TileColor.BLACK
         positions_p2 = [
-            (p2_start_x, p2_start_y),
-            (p2_start_x + 1, p2_start_y),
-            (p2_start_x - 1, p2_start_y),
-            (p2_start_x, p2_start_y + 1),
-            (p2_start_x, p2_start_y - 1),
+            (p2_x, p2_y),
+            (p2_x + 1, p2_y),
+            (p2_x - 1, p2_y),
+            (p2_x, p2_y + 1),
+            (p2_x, p2_y - 1),
         ]
         for x, y in positions_p2:
             if 0 <= x < self.width and 0 <= y < self.height:
@@ -107,8 +147,8 @@ class InversusEnv:
         
         # Legacy fields for backward compatibility (synced with player1)
         # Set private fields directly to avoid property setter during init
-        self._player_x = p1_start_x
-        self._player_y = p1_start_y
+        self._player_x = p1_x
+        self._player_y = p1_y
         
         # Clear bullets
         self.bullets = []

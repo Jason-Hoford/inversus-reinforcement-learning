@@ -136,17 +136,24 @@ After conquering the "Sitting Duck", we faced the **Hard Dummy** (Moves & Shoots
 *   **Adjustment**: We scaled rewards down (+500 -> +10) to prevent numerical instability, and adjusted penalties to encourage aggression instead of "cowardice".
 *   **Result**: **48% Win Rate** against a perfect Aimbot script. This is the skill ceiling for scripted opponents.
 
-### New Commands
+### 🔄 Phase 4 Reboot: The "Spawn Camping" Fix
+The initial Hard Mode training failed because the dummy was broken (passive) and spawns were fixed. The agent learned to "camp" the spawn.
 
-**Train against Hard Dummy (Curriculum Transfer):**
+We implemented:
+1.  **Random Spawns**: Players spawn anywhere on the map.
+2.  **Hunter Dummy**: Opponent actively aligns and shoots (20% chance/frame).
+
+**Result**: **60% Win Rate** against the Hunter-Killer. This agent is a *real* fighter.
+
+**Train against Hard Hunter (Curriculum):**
 ```bash
-python -m inversus_rl.training --mode vs_dummy --total_steps 500000 --num_envs 4 --opponent_difficulty hard --load_model runs/inversus_vs_dummy_base_v2/policy_final.pt
+python -m inversus_rl.training --mode vs_dummy --total_steps 500000 --num_envs 4 --opponent_difficulty hard --log_dir runs/inversus_hard_random_v1 --load_model runs/inversus_random_base_v1/policy_final.pt
 ```
 
 **Watch Agent vs Hard Dummy:**
 ```bash
 # Slow motion (0.5x speed) to see dodging behavior
-python -m inversus_rl.play runs/inversus_hard_aggressive/policy_final.pt --mode vs_dummy --opponent_difficulty hard --speed 0.5
+python -m inversus_rl.play runs/inversus_hard_random_v1/policy_final.pt --mode vs_dummy --opponent_difficulty hard --speed 0.5
 ```
 
 ### ⚔️ Phase 5: Self-Play (The Final Frontier)
@@ -155,8 +162,32 @@ The ultimate goal is to train the agent against **itself**. This allows it to di
 
 **Run Self-Play Training:**
 ```bash
-python -m inversus_rl.training --mode selfplay --total_steps 1000000 --num_envs 4 --log_dir runs/inversus_selfplay_v1 --load_model runs/inversus_hard_aggressive/policy_final.pt
+python -m inversus_rl.training --mode selfplay --total_steps 1000000 --num_envs 4 --log_dir runs/inversus_selfplay_random_v1 --load_model runs/inversus_hard_random_v1/policy_final.pt
 ```
 *   **Time**: This will take a long time (hours/days).
 *   **Logic**: The opponent is initially a clone of the agent. Every 20,000 steps, the opponent is updated to the latest version of the agent.
 *   **Goal**: Watch for the win rate to fluctuate around 50% (Equilibrium) as both sides get stronger.
+*   **Goal**: Watch for the win rate to fluctuate around 50% (Equilibrium) as both sides get stronger.
+
+## 🛠️ Fix Log (Latest Updates)
+
+We encountered detailed issue where the agent was "Spawn Camping" a broken dummy. Here are the fixes applied:
+
+1.  **Random Spawns (Anti-Camping)**:
+    *   **Effect**: Players now spawn at random valid locations instead of fixed coordinates.
+    *   **Code**: Updated `InversusEnv.reset()` in `core.py`.
+    *   **Result**: Agent forced to learn navigation and search behavior.
+
+2.  **"Hunter-Killer" Dummy**:
+    *   **Effect**: Replaced the passive dummy with an active Hunter logic.
+    *   **Logic**: If not aligned -> Move to align. If aligned -> Shoot (20% chance).
+    *   **Result**: A formidable opponent that punishes standing still.
+
+3.  **Crash Fixes**:
+    *   Fixed `AttributeError: 'TileColor'` in `core.py`.
+    *   Fixed `NameError: 'p2_start_x'` in `core.py` legacy init.
+
+---
+**Current Best Models:**
+1.  `runs/inversus_random_base_v1` (Base "Sitting Duck" Graduate)
+2.  `runs/inversus_hard_random_v1` (Hard "Hunter" Graduate - **60% WR**)
